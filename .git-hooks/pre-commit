@@ -1,0 +1,50 @@
+#!/bin/bash
+
+set -e
+
+if git-rev-parse --verify HEAD >/dev/null 2>&1
+then
+	against=HEAD
+else
+	# Initial commit: diff against an empty tree object
+	against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+fi
+
+function grep-check {
+    test="$1"
+    ignore="$2"
+    msg="$3"
+    if (git diff --cached | egrep -i "$test" | grep -v IGNORE:"$ignore"); then
+        echo "Error: $msg  (This message can be suppressed by adding the string IGNORE:$ignore to the same line.)"
+        exit 1
+    fi
+}
+
+function grep-check-case-sensitive {
+    test="$1"
+    ignore="$2"
+    msg="$3"
+    if (git diff --cached | egrep "$test" | grep -v IGNORE:"$ignore"); then
+        echo "Error: $msg  (This message can be suppressed by adding the string IGNORE:$ignore to the same line.)"
+        exit 1
+    fi
+}
+
+grep-check-case-sensitive \
+    NOCOMMIT `#IGNORE:NOCOMMIT` \
+    NOCOMMIT `#IGNORE:NOCOMMIT` \
+    "Found a line tagged with NOCOMMIT." # IGNORE:NOCOMMIT
+
+if ! cargo fmt --all -- --check; then
+    echo 'Please run `cargo fmt --all`.'
+    exit 1
+fi
+
+# Check for trailing whitespace
+git diff-index --check --cached $against --
+
+(cd robust-binary-search && cargo build --bin benchmark --features=benchmark)
+(cd robust-binary-search && cargo build --bin tuner --features=tuner)
+(cd robust-binary-search && cargo test --all-features)
+(cd robust-binary-search && cargo doc --all-features)
+(cd robust-git-bisect && cargo test)

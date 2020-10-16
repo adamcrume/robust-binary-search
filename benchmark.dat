@@ -1,0 +1,6 @@
+Method  Iterations Accuracy
+robust1 29.6558    0.995392
+robust2 26.1828    0.98895
+git1    16.1907    0.317972
+git2    35.0465    0.866359
+git3    72.3674    0.861751
