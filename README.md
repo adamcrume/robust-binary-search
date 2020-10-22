@@ -19,7 +19,7 @@ For library usage, see `AutoSearcher` for binary search over a linear range and
 ## Performance
 
 This code is optimized to minimize the number of tests executed (i.e. number of iterations) and not
-necessrily the CPU time of the search algorithm itself, so this will be slower than a plain binary
+necessarily the CPU time of the search algorithm itself, so this will be slower than a plain binary
 search if the test is deterministic.
 
 The linear algorithm (`Searcher` and `AutoSearcher`) takes approximately `O(log N)` time per
