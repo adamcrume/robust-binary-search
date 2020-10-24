@@ -10,8 +10,8 @@ adjustments to make it deterministic and then extended to support directed acycl
 
 ## Usage
 
-To use the git bisect replacement, install with `cargo install robust-binary-search`, and then
-`cargo robust-git-bisect --start-commit=?? --end-commit=?? --test-cmd=command-to-test-commit`
+To use the git bisect replacement, install with `cargo install robust-git-bisect`, and then
+`~/.cargo/bin/robust-git-bisect $start_commit $end_commit $command_to_test_commit`
 
 If you're looking for a library version of this, see the `robust-binary-search` crate which this is
 based on.
