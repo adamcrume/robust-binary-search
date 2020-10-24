@@ -17,6 +17,8 @@ name = "robust-binary-search"
 version = "0.1.0"
 authors = ["Adam Crume <acrume@google.com>"]
 edition = "2018"
+license = "Apache-2.0"
+description = "Robust Binary Search provides a binary search implementation which is robust against errors during the search."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
