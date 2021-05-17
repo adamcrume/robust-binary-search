@@ -17,7 +17,8 @@ use std::borrow::Borrow;
 use std::cmp;
 use std::rc::Rc;
 
-mod flakiness_tracker;
+#[doc(hidden)]
+pub mod flakiness_tracker;
 use flakiness_tracker::*;
 mod range_map;
 use range_map::*;
@@ -246,8 +247,11 @@ impl Searcher {
     }
 }
 
+/// INTERNAL ONLY.
+///
 /// Returns the stiffness which should be optimal for the given flakiness.
-fn optimal_stiffness(flakiness: f64) -> f64 {
+#[doc(hidden)]
+pub fn optimal_stiffness(flakiness: f64) -> f64 {
     // Values calculated by tuner.rs
     (2.6 / flakiness.powf(0.37))
         .min(0.58 / flakiness.powf(0.97))

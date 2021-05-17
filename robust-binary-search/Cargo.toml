@@ -35,8 +35,14 @@ regex = {version = "1.3.9", optional = true}
 simplelog = "0.8.0"
 
 [features]
+flakiness_tuner = ["rand"]
 tuner = ["rand"]
 benchmark = ["regex", "lazy_static", "rand"]
+
+[[bin]]
+name = "flakiness_tuner"
+path = "src/flakiness_tuner.rs"
+required-features = ["flakiness_tuner"]
 
 [[bin]]
 name = "tuner"

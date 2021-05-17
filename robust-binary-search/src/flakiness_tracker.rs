@@ -14,9 +14,12 @@
 
 use std::collections::BTreeMap;
 
+/// INTERNAL ONLY.
+///
 /// Calculates vote inversions in a linear range, which can be used to estimate flakiness.
+#[doc(hidden)]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct FlakinessTracker {
+pub struct FlakinessTracker {
     /// Maps index to number of number of tails votes and number of heads votes.
     votes: BTreeMap<usize, (usize, usize)>,
     total_heads: usize,
@@ -74,43 +77,13 @@ impl FlakinessTracker {
     /// Returns the estimated flakiness based on the votes, where 0.0 is deterministic and 1.0 is
     /// complete randomness.
     pub fn flakiness(&self) -> f64 {
-        // For a given set of votes, the ratio of inversions to random inversions seems to depend
-        // only on the flakiness, at least if all nodes are true heads or true tails.  For example,
-        // given two buckets, with m and n votes, all with probability p of being heads, the
-        // expected number of inversions is:
-        //
-        //   i = p(1-p)m^2 + p(1-p)mn + p(1-p)n^2
-        //
-        // or
-        //
-        //   i = p(1-p)(m^2 + mn + n^2)
-        //
-        // and if we fix p=1/2 (the random case), this is:
-        //
-        //   r = 1/4 (m^2 + mn + n^2)
-        //
-        // so the ratio of expected to random inverions is
-        //
-        //   i / r = 4p(1-p)
-        //
-        // and solving for p constrained to 0 <= p <= 1 we get:
-        //
-        //   p = 1/2 - 1/2 sqrt(1 - i/r)
-        //
-        // and since flakiness is twice the probability, we finally get:
-        //
-        //   flakiness = 1 - sqrt(1 - i/r)
-        //
-        // plus some numerical niceties and a Bayesian prior.
-        //
-        // Unfortunately, this doesn't quite work out if the votes are half true heads and half true
-        // tails (which is the common case, at least once the binary search has been running for a
-        // few iterations). Thankfully, it seems to be off by a relative factor of 1/3 in the worst
-        // case, which is good enough for the order-of-magnitude flakiness calculation that we need
-        // here.
+        // The formula used here is provided by flakiness_tuner.rs (and fit by
+        // recovered_flakiness.plt), plus some numerical niceties and a Bayesian prior.
+        // ar^2 + br - f = 0
+        // (-b + sqrt(b^2 + 4af))/(2a)
         let (inv, rand_inv) = self.inversions();
-        let tmp = 1.0 - (inv + 1) as f64 / (rand_inv as f64 / 4.0 + 4.0 / 3.0);
-        1.0 - tmp.max(0.0).sqrt()
+        let r = (inv + 1) as f64 / (rand_inv as f64 + 7.6143);
+        (0.1698 * r * r + 3.7844 * r).min(1.0).max(0.0)
     }
 }
 
@@ -135,7 +108,7 @@ mod tests {
         tracker.report(0, true);
         assert_eq!(tracker.inversions(), (0, 1));
         assert!(
-            (tracker.flakiness() - 0.3930).abs() < 1e-4,
+            (tracker.flakiness() - 0.4416).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -147,7 +120,7 @@ mod tests {
         tracker.report(0, true);
         assert_eq!(tracker.inversions(), (0, 1));
         assert!(
-            (tracker.flakiness() - 0.393).abs() < 1e-4,
+            (tracker.flakiness() - 0.4416).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -160,7 +133,7 @@ mod tests {
         tracker.report(0, true);
         assert_eq!(tracker.inversions(), (0, 4));
         assert!(
-            (tracker.flakiness() - 0.2441).abs() < 1e-4,
+            (tracker.flakiness() - 0.3271).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -173,7 +146,7 @@ mod tests {
         tracker.report(1, true);
         assert_eq!(tracker.inversions(), (0, 3));
         assert!(
-            (tracker.flakiness() - 0.2789).abs() < 1e-4,
+            (tracker.flakiness() - 0.3581).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -186,7 +159,7 @@ mod tests {
         tracker.report(0, false);
         assert_eq!(tracker.inversions(), (0, 4));
         assert!(
-            (tracker.flakiness() - 0.2441).abs() < 1e-4,
+            (tracker.flakiness() - 0.3271).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -199,7 +172,7 @@ mod tests {
         tracker.report(1, false);
         assert_eq!(tracker.inversions(), (0, 3));
         assert!(
-            (tracker.flakiness() - 0.2789).abs() < 1e-4,
+            (tracker.flakiness() - 0.3581).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -212,7 +185,7 @@ mod tests {
         tracker.report(0, true);
         assert_eq!(tracker.inversions(), (1, 4));
         assert!(
-            (tracker.flakiness() - 0.622).abs() < 1e-4,
+            (tracker.flakiness() - 0.6567).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -225,7 +198,7 @@ mod tests {
         tracker.report(1, false);
         assert_eq!(tracker.inversions(), (1, 3));
         assert!(
-            (tracker.flakiness() - 0.8).abs() < 1e-4,
+            (tracker.flakiness() - 0.7191).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -238,7 +211,7 @@ mod tests {
         tracker.report(1, true);
         assert_eq!(tracker.inversions(), (0, 3));
         assert!(
-            (tracker.flakiness() - 0.2789).abs() < 1e-4,
+            (tracker.flakiness() - 0.3580).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -252,7 +225,7 @@ mod tests {
         }
         assert_eq!(tracker.inversions(), (0, 10000));
         assert!(
-            (tracker.flakiness() - 0.0002).abs() < 1e-4,
+            (tracker.flakiness() - 0.0004).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -267,7 +240,7 @@ mod tests {
         tracker.report(0, false);
         assert_eq!(tracker.inversions(), (100, 10201));
         assert!(
-            (tracker.flakiness() - 0.02).abs() < 1e-4,
+            (tracker.flakiness() - 0.0375).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );
@@ -282,7 +255,7 @@ mod tests {
         }
         assert_eq!(tracker.inversions(), (10000, 40000));
         assert!(
-            (tracker.flakiness() - 0.9942).abs() < 1e-4,
+            (tracker.flakiness() - 0.9566).abs() < 1e-4,
             "flakiness = {}",
             tracker.flakiness()
         );

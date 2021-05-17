@@ -45,6 +45,7 @@ git diff-index --check --cached $against --
 
 (cd robust-binary-search && cargo build --bin benchmark --features=benchmark)
 (cd robust-binary-search && cargo build --bin tuner --features=tuner)
+(cd robust-binary-search && cargo build --bin flakiness_tuner --features=flakiness_tuner)
 (cd robust-binary-search && cargo test --all-features)
 (cd robust-binary-search && cargo doc --all-features)
 (cd robust-git-bisect && cargo test)
