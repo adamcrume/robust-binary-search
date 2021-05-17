@@ -21,6 +21,7 @@ license = "Apache-2.0"
 description = "Robust Git Bisect provides an alternative to git bisect which is robust against errors during the search."
 repository = "https://github.com/adamcrume/robust-binary-search"
 categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
