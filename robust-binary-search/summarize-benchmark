@@ -1,0 +1,34 @@
+#!/bin/bash
+
+awk '
+{
+  iterations0 += $2;
+  if($3 == "correct") {
+    correct0++;
+  }
+  iterations1 += $4;
+  if($5 == "correct") {
+    correct1++;
+  }
+  iterations2 += $6;
+  if($7 == "correct") {
+    correct2++;
+  }
+  iterations3 += $8;
+  if($9 == "correct") {
+    correct3++;
+  }
+  iterations4 += $10;
+  if($11 == "correct") {
+    correct4++;
+  }
+  count++;
+}
+END {
+  printf "%-7s %f %f\n", "robust1", iterations0/count, (correct0+1)/(count+2);
+  printf "%-7s %f %f\n", "robust2", iterations1/count, (correct1+1)/(count+2);
+  printf "%-7s %f %f\n", "git1", iterations2/count, (correct2+1)/(count+2);
+  printf "%-7s %f %f\n", "git2", iterations3/count, (correct3+1)/(count+2);
+  printf "%-7s %f %f\n", "git3", iterations4/count, (correct4+1)/(count+2);
+}
+' < benchmark.dat

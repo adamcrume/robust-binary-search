@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# {
+# cat <<EOF
+# {"reason":"compiler-artifact","package_id":"regex-derivatives 0.1.0 (path+file:///home/adam/git/regex-derivatives)","target":{"kind":["lib"],"crate_types":["lib"],"name":"regex-derivatives","src_path":"/home/adam/git/regex-derivatives/src/lib.rs","edition":"2015","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/home/adam/git/regex-derivatives/target/debug/deps/regex_derivatives-f5ee1c2177030c0d"],"executable":"/home/adam/git/regex-derivatives/target/debug/deps/regex_derivatives-f5ee1c2177030c0d","fresh":true}
+# EOF
+# } | jq .
+
+#cargo test --message-format=json --no-run|grep target/debug/deps/regex | jq -r '.executable'
+
+#gdb -se "$(cargo cargo build --bin tuner_split --features tuner_split --message-format=json | jq -r 'select(.reason=="compiler-artifact" and .profile.test==true) | .executable')"
+cargo build --bin tuner_split --features tuner_split --message-format=json | jq -r 'select(.reason=="compiler-artifact") | .executable'

@@ -15,6 +15,7 @@
 use log::trace;
 use std::borrow::Borrow;
 use std::cmp;
+use std::fmt::Debug;
 use std::rc::Rc;
 
 #[doc(hidden)]
@@ -24,6 +25,8 @@ mod range_map;
 use range_map::*;
 
 mod dag;
+#[cfg(feature = "tuner_split")]
+pub mod optimizer;
 
 /// Reference to a node in a CompressedDAG.
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
@@ -292,6 +295,17 @@ impl AutoSearcher {
             .report(index, heads, self.flakiness_tracker.flakiness());
     }
 
+    /// Adds a vote to the internal statistics. With low flakiness, false votes are expected to have
+    /// smaller indices than true votes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index >= len`.
+    pub fn report_flakiness(&mut self, index: usize, heads: bool, flakiness: f64) {
+        self.flakiness_tracker.report(index, heads);
+        self.searcher.report(index, heads, flakiness);
+    }
+
     /// Returns the next index that should be tested. Can return values in the range 0 to len,
     /// exclusive.
     pub fn next_index(&self) -> usize {
@@ -539,6 +553,17 @@ impl AutoCompressedDAGSearcher {
             .report(node, heads, self.flakiness_tracker.flakiness());
     }
 
+    /// Adds a vote to the internal statistics. With low flakiness, nodes with false votes are
+    /// expected not to nodes with true votes as ancestors.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is out of range.
+    pub fn report_flakiness(&mut self, node: CompressedDAGNodeRef, heads: bool, flakiness: f64) {
+        self.flakiness_tracker.report(node, heads);
+        self.searcher.report(node, heads, flakiness);
+    }
+
     /// Returns the next node that should be tested.
     pub fn next_node(&self) -> CompressedDAGNodeRef {
         self.searcher.next_node()
@@ -561,6 +586,84 @@ impl AutoCompressedDAGSearcher {
     /// Returns the estimated flakiness.
     pub fn flakiness(&self) -> f64 {
         self.flakiness_tracker.flakiness()
+    }
+}
+
+// TODO: Should this be in the main lib?
+pub trait StiffnessCalculator: Debug {
+    fn stiffness(&self, flakiness: f64) -> f64;
+}
+
+// We're using Chebyshev polynomials to avoid issues with the higher
+// order powers of x being zero for most of the range, which means that
+// using coefficients of powers of x directly is unstable.
+// TODO: Should this be in the main lib?
+#[derive(Clone, Debug)]
+pub struct ChebyshevStiffnessCalculator {
+    // TODO: make private
+    pub params: Vec<f64>,
+}
+
+impl ChebyshevStiffnessCalculator {
+    pub fn new(params: Vec<f64>) -> Self {
+        // TODO: support other orders
+        assert_eq!(params.len(), 6);
+        Self { params }
+    }
+}
+
+impl StiffnessCalculator for ChebyshevStiffnessCalculator {
+    fn stiffness(&self, x: f64) -> f64 {
+        let x = 2.0 * x - 1.0; // was [0, 1], is now [-1, 1]
+        let x2 = x * x;
+        let x3 = x2 * x;
+        let x4 = x3 * x;
+        let x5 = x4 * x;
+        let x6 = x5 * x;
+        let t0 = 1.0;
+        let t1 = x;
+        let t2 = 2.0 * x2 - 1.0;
+        let t3 = 4.0 * x3 - 3.0 * x;
+        let t4 = 8.0 * x4 - 8.0 * x2 + 1.0;
+        let t5 = 16.0 * x5 - 20.0 * x3 + 5.0 * x;
+        let t6 = 32.0 * x6 - 48.0 * x4 + 18.0 * x2 - 1.0;
+        let p = &self.params;
+        (p[0] * t0 + p[1] * t1 + p[2] * t2 + p[2] * t3 + p[3] * t4 + p[4] * t5 + p[5] * t6)
+            .max(0.01)
+    }
+}
+
+// TODO: Should this be in the main lib?
+#[derive(Clone, Debug)]
+pub struct InterpolatingStiffnessCalculator {
+    // TODO: make private
+    pub params: Vec<f64>,
+}
+
+impl InterpolatingStiffnessCalculator {
+    fn new(params: Vec<f64>) -> Self {
+        Self { params }
+    }
+}
+
+impl StiffnessCalculator for InterpolatingStiffnessCalculator {
+    fn stiffness(&self, x: f64) -> f64 {
+        let n = self.params.len() - 1;
+        let mut start = self.params[n - 1];
+        let mut end = self.params[n];
+        let mut diff = 1.0 / n as f64;
+        let mut found = false;
+        for i in 0..n {
+            if x < (i + 1) as f64 / n as f64 {
+                start = self.params[i];
+                end = self.params[i + 1];
+                diff = x - i as f64 / n as f64;
+                found = true;
+                break;
+            }
+        }
+        let alpha = diff * n as f64;
+        (start.exp() * (1.0 - alpha) + end.exp() * alpha).max(0.01)
     }
 }
 
