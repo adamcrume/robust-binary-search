@@ -141,7 +141,7 @@ fn run_bisect<P: AsRef<Path>>(
             cmd.current_dir(&dir).arg("checkout").arg(commit)
         })
         .unwrap();
-        let heads = !run("sh", |cmd| cmd.current_dir(&dir).arg("-c").arg(test_cmd)).is_ok();
+        let heads = run("sh", |cmd| cmd.current_dir(&dir).arg("-c").arg(test_cmd)).is_err();
         println!(
             "Reporting {} as {}",
             commit,
@@ -228,16 +228,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut parents = HashMap::<String, Vec<String>>::new();
     let mut children = HashMap::<String, Vec<String>>::new();
     for line in commit_log.lines() {
-        let mut hashes = line.split(" ").map(|s| s.to_string()).collect::<Vec<_>>();
+        let mut hashes = line.split(' ').map(|s| s.to_string()).collect::<Vec<_>>();
         let commit = hashes.swap_remove(0);
         for parent in hashes.into_iter() {
             children
                 .entry(parent.clone())
-                .or_insert_with(|| Vec::new())
+                .or_insert_with(Vec::new)
                 .push(commit.clone());
             parents
                 .entry(commit.clone())
-                .or_insert_with(|| Vec::new())
+                .or_insert_with(Vec::new)
                 .push(parent);
         }
     }
@@ -278,7 +278,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    for (_key, value) in &mut segments {
+    for value in segments.values_mut() {
         let commit_set = value.commits.iter().cloned().collect::<HashSet<String>>();
         let first_commits = value
             .commits
@@ -291,13 +291,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect::<Vec<String>>();
         assert_eq!(first_commits.len(), 1);
         let mut commit = first_commits[0].clone();
-        let mut sorted_commits = Vec::new();
-        sorted_commits.push(commit.clone());
-        loop {
-            let child_commits = match children.get(&commit) {
-                Some(x) => x,
-                None => break,
-            };
+        let mut sorted_commits = vec![commit.clone()];
+        while let Some(child_commits) = children.get(&commit) {
             if child_commits.len() != 1 {
                 break;
             }
@@ -339,7 +334,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect::<Vec<_>>();
 
     info!("Running bisection");
-    let metrics = run_bisect(&dir, &git_segments, &test_cmd, min_likelihood);
+    let metrics = run_bisect(&dir, &git_segments, test_cmd, min_likelihood);
     for (k, v) in metrics {
         info!("{}: {}", k, v.as_secs_f64());
     }

@@ -52,6 +52,11 @@ impl CompressedDAGSegment {
     pub fn len(&self) -> usize {
         self.len
     }
+
+    /// Returns true if the segment is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
 }
 
 /// A DAG whose nodes are CompressedDAGSegments, which represent sequences of nodes in a conceptual
@@ -323,7 +328,7 @@ impl CompressedDAGSearcher {
             .nodes()
             .iter()
             .map(|node| node.value().len())
-            .fold(0, |x, y| x + y);
+            .sum::<usize>();
         let segment_range_maps = graph
             .nodes()
             .iter()
@@ -361,7 +366,7 @@ impl CompressedDAGSearcher {
             segment_sums.push(segment_sum);
             let end = start + segment_sum;
             assert!(
-                start >= 0.0 && start <= 1.0 + 1e-11 && end >= 0.0 && end <= 1.0 + 1e-11,
+                (0.0..=1.0 + 1e-11).contains(&start) && (0.0..=1.0 + 1e-11).contains(&end),
                 "i = {} of {}, start = {}, end = {}",
                 i,
                 self.segment_range_maps.len(),
@@ -710,7 +715,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_singleton() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(1), vec![]);
         let searcher = CompressedDAGSearcher::new(Rc::new(graph));
         assert_eq!(
@@ -724,7 +729,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_single_segment() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         let searcher = CompressedDAGSearcher::new(Rc::new(graph));
         assert_eq!(
@@ -738,7 +743,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_parallel_segments() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         let searcher = CompressedDAGSearcher::new(Rc::new(graph));
@@ -753,7 +758,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_parallel_unequal_segments() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         let searcher = CompressedDAGSearcher::new(Rc::new(graph));
@@ -768,7 +773,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_parallel_unequal_segments2() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         let searcher = CompressedDAGSearcher::new(Rc::new(graph));
@@ -783,7 +788,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_sequential_segments() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         graph.add_node(CompressedDAGSegment::new(10), vec![0]);
         graph.add_node(CompressedDAGSegment::new(10), vec![1]);
@@ -799,7 +804,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_fork() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         graph.add_node(CompressedDAGSegment::new(10), vec![0]);
         graph.add_node(CompressedDAGSegment::new(10), vec![0]);
@@ -815,7 +820,7 @@ mod tests {
 
     #[test]
     fn graph_confidence_percentile_nearest_merge() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         graph.add_node(CompressedDAGSegment::new(10), vec![]);
         graph.add_node(CompressedDAGSegment::new(10), vec![0, 1]);
@@ -860,7 +865,7 @@ mod tests {
 
     #[test]
     fn graph_two_elements_zero() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(2), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
         assert_graph_index!(s, (0, 0), (0, 0), true, DEFAULT_FLAKINESS);
@@ -869,7 +874,7 @@ mod tests {
 
     #[test]
     fn graph_two_elements_one() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(2), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
         assert_graph_index!(s, (0, 0), (0, 0), false, DEFAULT_FLAKINESS);
@@ -879,7 +884,7 @@ mod tests {
 
     #[test]
     fn graph_many_elements_last() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(1024), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
         assert_graph_index!(s, (0, 511), (0, 511), false, DEFAULT_FLAKINESS);
@@ -891,7 +896,7 @@ mod tests {
 
     #[test]
     fn graph_parallel_first_first() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
@@ -909,7 +914,7 @@ mod tests {
 
     #[test]
     fn graph_parallel_first_last() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
@@ -928,7 +933,7 @@ mod tests {
 
     #[test]
     fn graph_parallel_last_first() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
@@ -946,7 +951,7 @@ mod tests {
 
     #[test]
     fn graph_parallel_last_last() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
@@ -964,7 +969,7 @@ mod tests {
 
     #[test]
     fn graph_parallel_first_half() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
@@ -982,7 +987,7 @@ mod tests {
 
     #[test]
     fn graph_parallel_second_half() {
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         let mut s = CompressedDAGSearcher::new(Rc::new(graph));
@@ -1003,7 +1008,7 @@ mod tests {
         //      /-1-\
         // *-0-*     *-3-*
         //      \-2-/
-        let mut graph = CompressedDAG::new();
+        let mut graph = CompressedDAG::default();
         graph.add_node(CompressedDAGSegment::new(100), vec![]);
         graph.add_node(CompressedDAGSegment::new(100), vec![0]);
         graph.add_node(CompressedDAGSegment::new(100), vec![0]);

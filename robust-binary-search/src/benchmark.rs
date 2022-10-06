@@ -14,17 +14,14 @@
 
 use lazy_static::lazy_static;
 use log::info;
-use log::trace;
 use rand;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use regex::Regex;
-use robust_binary_search::*;
 use simplelog::Config;
 use simplelog::LevelFilter;
 use simplelog::TermLogger;
 use simplelog::TerminalMode;
-use std::cmp;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -307,5 +304,4 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
         f.sync_data()?;
     }
-    Ok(())
 }

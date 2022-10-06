@@ -62,6 +62,12 @@ pub struct DAG<T> {
     nodes: Vec<DAGNode<T>>,
 }
 
+impl<T> Default for DAG<T> {
+    fn default() -> Self {
+        Self { nodes: vec![] }
+    }
+}
+
 impl<T> DAG<T> {
     /// Creates an empty DAG.
     pub fn new() -> Self {
@@ -138,7 +144,7 @@ mod tests {
 
     #[test]
     fn ancestor_segments() {
-        let mut graph = DAG::new();
+        let mut graph = DAG::default();
         graph.add_node((), vec![]);
         graph.add_node((), vec![0]);
         graph.add_node((), vec![1]);
@@ -154,7 +160,7 @@ mod tests {
         // 0---1---2
         //  \       \
         //   3---4---x
-        let mut graph = DAG::new();
+        let mut graph = DAG::default();
         graph.add_node((), vec![]);
         graph.add_node((), vec![0]);
         graph.add_node((), vec![1]);

@@ -24,6 +24,7 @@ pub struct RangeMapEntry<T> {
 }
 
 impl<T> RangeMapEntry<T> {
+    #[allow(dead_code)]
     /// Returns the index of the first individual value in the range.
     pub fn offset(&self) -> usize {
         self.offset
