@@ -164,10 +164,10 @@ fn report_range(weights: &mut RangeMap<f64>, index: usize, heads: bool, stiffnes
         for w in weights.split(index).0 {
             *w.value_mut() *= 1.0 + stiffness;
         }
-        let (left, _right) = weights.split(index + 1);
-        *left.rev().next().unwrap().value_mut() *= 1.0 + stiffness;
+        let (mut left, _right) = weights.split(index + 1);
+        *left.next_back().unwrap().value_mut() *= 1.0 + stiffness;
     } else {
-        weights.split(index);
+        let _ = weights.split(index);
         let (_left, right) = weights.split(index + 1);
         for w in right {
             *w.value_mut() *= 1.0 + stiffness;

@@ -111,7 +111,7 @@ impl<T> DAG<T> {
                 queue.push(*input);
             }
             while let Some(ancestor) = queue.pop() {
-                if ancestors.insert(ancestor) == None {
+                if ancestors.insert(ancestor).is_none() {
                     remainder_ancestors.insert(ancestor);
                     for ancestor_input in &self.nodes[ancestor].inputs {
                         queue.push(*ancestor_input);

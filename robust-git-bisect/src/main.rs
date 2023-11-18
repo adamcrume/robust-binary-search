@@ -219,7 +219,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let commit_log = run("git", |command| {
         // TODO: Do we need --ancestry-path?
         command
-            .current_dir(&dir)
+            .current_dir(dir)
             .arg("log")
             .arg(format!("{}..{}", start_commit, end_commit))
             .arg("--format=format:%H %P")
@@ -334,7 +334,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect::<Vec<_>>();
 
     info!("Running bisection");
-    let metrics = run_bisect(&dir, &git_segments, test_cmd, min_likelihood);
+    let metrics = run_bisect(dir, &git_segments, test_cmd, min_likelihood);
     for (k, v) in metrics {
         info!("{}: {}", k, v.as_secs_f64());
     }
