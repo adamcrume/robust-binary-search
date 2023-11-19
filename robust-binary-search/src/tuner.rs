@@ -34,7 +34,7 @@ fn steps_required<R: Rng>(rng: &mut R, flakiness: f64, stiffness: f64) -> f64 {
             max,
             loop {
                 i += 1;
-                let test_index = searcher.next_index();
+                let test_index = searcher.next_index().unwrap();
                 if test_index == index || i == max_steps {
                     break i;
                 }
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let to_stiffness = |i| log_interpolate(i, stiffness_buckets, min_stiffness, max_stiffness);
         let window = 1.5;
         for i in 0..1000 {
-            let test_index = searcher.next_index();
+            let test_index = searcher.next_index().unwrap();
             let steps1 = steps_required(&mut rng, flakiness, to_stiffness(test_index) / window);
             let steps2 = steps_required(&mut rng, flakiness, to_stiffness(test_index) * window);
             let heads = if steps1 < steps2 {

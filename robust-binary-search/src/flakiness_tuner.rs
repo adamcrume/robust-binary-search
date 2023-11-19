@@ -32,7 +32,7 @@ fn sample_inversions<R: Rng>(rng: &mut R, p: f64) -> (usize, usize) {
     let max_steps = 10000;
     loop {
         i += 1;
-        let test_index = searcher.next_index();
+        let test_index = searcher.next_index().unwrap();
         if test_index == index || i == max_steps {
             break;
         }

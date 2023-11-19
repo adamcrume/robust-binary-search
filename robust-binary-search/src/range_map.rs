@@ -143,6 +143,7 @@ impl<T: Clone> RangeMap<T> {
     /// Ensures that `index-1` and `index` are in different RangeMapEntrys.
     /// Returns the index of the RangeMapEntry containing `index`.
     fn _split(&mut self, index: usize) -> usize {
+        // TODO: find i using binary search
         for i in 0..self.values.len() {
             let w = self.values[i].clone();
             if w.offset == index {

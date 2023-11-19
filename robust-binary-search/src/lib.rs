@@ -15,6 +15,7 @@
 use log::trace;
 use std::borrow::Borrow;
 use std::cmp;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 #[doc(hidden)]
@@ -185,6 +186,7 @@ fn report_range(weights: &mut RangeMap<f64>, index: usize, heads: bool, stiffnes
 #[derive(Clone, Debug)]
 pub struct Searcher {
     weights: RangeMap<f64>,
+    skips: HashSet<usize>,
     len: usize,
 }
 
@@ -194,7 +196,13 @@ impl Searcher {
         Searcher {
             weights: RangeMap::new(len + 1, 1.0 / (len as f64 + 1.0)),
             len,
+            skips: HashSet::default(),
         }
+    }
+
+    /// Adds an index which cannot be tested. `next_index` will never return this index.
+    pub fn add_skip(&mut self, skip: usize) {
+        self.skips.insert(skip);
     }
 
     /// Same as `report` but with a specified stiffness. Only public for use by the tuner, not for
@@ -218,7 +226,8 @@ impl Searcher {
     }
 
     /// Adds a vote to the internal statistics. With low flakiness, false votes are expected to have
-    /// smaller indices than true votes.
+    /// smaller indices than true votes. In other words, false means the index is probably too low,
+    /// and true means the index is probably correct or too high.
     ///
     /// # Panics
     ///
@@ -229,11 +238,44 @@ impl Searcher {
 
     /// Returns the next index that should be tested. Can return values in the range 0 to len,
     /// exclusive.
-    pub fn next_index(&self) -> usize {
-        cmp::min(
+    pub fn next_index(&self) -> Option<usize> {
+        let original_ix = cmp::min(
             confidence_percentile_nearest(&self.weights, 0.5).0,
             self.len - 1,
-        )
+        );
+        let mut ix = original_ix;
+        let mut attempt = 0;
+        let mut can_inc = true;
+        let mut can_dec = true;
+        // Try indexes near the desired index, alternating above and below, while staying within
+        // bounds. I'm sure this can be made more efficient (e.g. storing skips as ranges).
+        while self.skips.contains(&ix) {
+            if attempt % 2 == 0 {
+                if ix + attempt + 1 >= self.len {
+                    can_inc = false;
+                }
+                if can_inc {
+                    ix += attempt + 1;
+                } else if ix > 0 {
+                    ix -= 1;
+                } else {
+                    return None;
+                }
+            } else {
+                if ix < attempt + 1 {
+                    can_dec = false;
+                }
+                if can_dec {
+                    ix -= attempt + 1;
+                } else if ix + 1 < self.len {
+                    ix += 1;
+                } else {
+                    return None;
+                }
+            }
+            attempt += 1;
+        }
+        Some(ix)
     }
 
     /// Returns the current estimate of the best index. Can return values in the range 0 to len,
@@ -300,7 +342,7 @@ impl AutoSearcher {
 
     /// Returns the next index that should be tested. Can return values in the range 0 to len,
     /// exclusive.
-    pub fn next_index(&self) -> usize {
+    pub fn next_index(&self) -> Option<usize> {
         self.searcher.next_index()
     }
 
@@ -584,7 +626,7 @@ mod tests {
 
     macro_rules! assert_index {
         ($searcher:expr, $next:expr, $best:expr, $heads:expr, $flakiness:expr) => {
-            assert_eq!($searcher.next_index(), $next, "next_index");
+            assert_eq!($searcher.next_index().unwrap(), $next, "next_index");
             assert_eq!($searcher.best_index(), $best, "best_index");
             $searcher.report($next, $heads, $flakiness);
         };
@@ -723,6 +765,146 @@ mod tests {
         assert_index!(s, 1023, 1024, false, DEFAULT_FLAKINESS);
         assert_index!(s, 1023, 1024, false, DEFAULT_FLAKINESS);
         assert_index!(s, 1023, 1024, false, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn one_element_skip_zero() {
+        let mut s = Searcher::new(1);
+        s.add_skip(0);
+        assert_eq!(s.next_index(), None);
+    }
+
+    #[test]
+    fn two_elements_zero_skip_zero() {
+        let mut s = Searcher::new(2);
+        s.add_skip(0);
+        assert_index!(s, 1, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 1, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 1, 1, true, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn two_elements_zero_skip_one() {
+        let mut s = Searcher::new(2);
+        s.add_skip(1);
+        assert_index!(s, 0, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn two_elements_one_skip_one() {
+        let mut s = Searcher::new(2);
+        s.add_skip(1);
+        assert_index!(s, 0, 1, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 1, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 1, false, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn many_elements_first_skip_mid() {
+        let mut s = Searcher::new(1024);
+        s.add_skip(512);
+        assert_index!(s, 513, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 273, 273, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 145, 145, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 77, 77, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 41, 41, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 21, 22, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 11, 11, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 5, 6, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 2, 3, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 1, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn many_elements_first_skip_mid2() {
+        let mut s = Searcher::new(1024);
+        s.add_skip(512);
+        s.add_skip(513);
+        assert_index!(s, 511, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 272, 272, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 144, 145, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 76, 77, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 40, 41, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 21, 21, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 11, 11, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 5, 6, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 2, 3, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 1, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn many_elements_first_skip_mid3() {
+        let mut s = Searcher::new(1024);
+        s.add_skip(512);
+        s.add_skip(513);
+        s.add_skip(511);
+        assert_index!(s, 514, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 273, 274, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 145, 145, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 77, 77, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 41, 41, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 21, 22, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 11, 11, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 5, 6, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 2, 3, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 1, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn many_elements_first_skip_mid4() {
+        let mut s = Searcher::new(1024);
+        s.add_skip(512);
+        s.add_skip(513);
+        s.add_skip(511);
+        s.add_skip(514);
+        assert_index!(s, 510, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 271, 272, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 144, 144, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 76, 77, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 40, 41, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 21, 21, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 11, 11, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 5, 6, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 2, 3, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 1, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 1, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 0, 0, true, DEFAULT_FLAKINESS);
+    }
+
+    #[test]
+    fn many_elements_mid_skip_mid() {
+        let mut s = Searcher::new(1024);
+        s.add_skip(512);
+        assert_index!(s, 513, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 273, 273, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 401, 401, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 469, 469, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 505, 506, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 687, 687, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 529, 530, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 509, 509, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 513, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 511, 511, false, DEFAULT_FLAKINESS);
+        assert_index!(s, 513, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 513, 512, true, DEFAULT_FLAKINESS);
+        assert_index!(s, 513, 512, true, DEFAULT_FLAKINESS);
     }
 
     #[test]
