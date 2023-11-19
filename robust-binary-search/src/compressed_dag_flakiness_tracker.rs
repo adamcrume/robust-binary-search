@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::CompressedDAG;
-use crate::CompressedDAGNodeRef;
+use crate::CompressedDag;
+use crate::CompressedDagNodeRef;
 use crate::FlakinessTracker;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
@@ -22,14 +22,14 @@ use std::rc::Rc;
 
 /// Calculates vote inversions over a graph, which can be used to estimate flakiness.
 #[derive(Clone, Debug)]
-pub(crate) struct CompressedDAGFlakinessTracker {
-    graph: Rc<CompressedDAG>,
+pub(crate) struct CompressedDagFlakinessTracker {
+    graph: Rc<CompressedDag>,
     votes: BTreeMap<usize, FlakinessTracker>,
 }
 
-impl CompressedDAGFlakinessTracker {
-    /// Creates a CompressedDAGFlakinessTracker for the given graph.
-    pub fn new(graph: Rc<CompressedDAG>) -> Self {
+impl CompressedDagFlakinessTracker {
+    /// Creates a CompressedDagFlakinessTracker for the given graph.
+    pub fn new(graph: Rc<CompressedDag>) -> Self {
         Self {
             graph,
             votes: BTreeMap::new(),
@@ -38,7 +38,7 @@ impl CompressedDAGFlakinessTracker {
 
     /// Adds a vote to the internal statistics. With low flakiness, true votes are expected not to
     /// appear in the ancestors of false votes.
-    pub fn report(&mut self, node: CompressedDAGNodeRef, heads: bool) {
+    pub fn report(&mut self, node: CompressedDagNodeRef, heads: bool) {
         self.votes
             .entry(node.segment)
             .or_insert_with(FlakinessTracker::default)
@@ -51,7 +51,7 @@ impl CompressedDAGFlakinessTracker {
     /// to avoid loss of precision.
     fn inversions(&self) -> (usize, usize) {
         let mut votes_at_segment = HashMap::new();
-        let graph: &CompressedDAG = self.graph.borrow();
+        let graph: &CompressedDag = self.graph.borrow();
         for segment in self.votes.keys() {
             let inputs = graph.node(*segment).inputs();
             if !inputs.is_empty() {
@@ -99,7 +99,7 @@ impl CompressedDAGFlakinessTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CompressedDAGSegment;
+    use crate::CompressedDagSegment;
 
     macro_rules! assert_flakiness {
         ($tracker:expr, $flakiness:expr) => {
@@ -114,20 +114,20 @@ mod tests {
 
     #[test]
     fn empty() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         assert_eq!(tracker.inversions(), (0, 0));
         assert_flakiness!(tracker, 0.5);
     }
 
     #[test]
     fn one_head() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
@@ -139,11 +139,11 @@ mod tests {
 
     #[test]
     fn one_tail() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
@@ -155,18 +155,18 @@ mod tests {
 
     #[test]
     fn two_heads_same_bucket() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
@@ -178,18 +178,18 @@ mod tests {
 
     #[test]
     fn two_heads_different_buckets() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 1,
             },
@@ -201,18 +201,18 @@ mod tests {
 
     #[test]
     fn two_tails_same_bucket() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             false,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
@@ -224,18 +224,18 @@ mod tests {
 
     #[test]
     fn two_tails_different_buckets() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             false,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 1,
             },
@@ -247,18 +247,18 @@ mod tests {
 
     #[test]
     fn one_head_one_tail_same_bucket() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             false,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
@@ -270,18 +270,18 @@ mod tests {
 
     #[test]
     fn one_head_one_tail_inverted() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 1,
             },
@@ -293,18 +293,18 @@ mod tests {
 
     #[test]
     fn one_head_one_tail_not_inverted() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             false,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 1,
             },
@@ -316,14 +316,14 @@ mod tests {
 
     #[test]
     fn flakiness_scan_one_index() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
         let graph = Rc::new(graph);
         for i in 0..100 {
-            let mut tracker = CompressedDAGFlakinessTracker::new(graph.clone());
+            let mut tracker = CompressedDagFlakinessTracker::new(graph.clone());
             for _ in 0..i {
                 tracker.report(
-                    CompressedDAGNodeRef {
+                    CompressedDagNodeRef {
                         segment: 0,
                         index: 0,
                     },
@@ -332,7 +332,7 @@ mod tests {
             }
             for _ in i..100 {
                 tracker.report(
-                    CompressedDAGNodeRef {
+                    CompressedDagNodeRef {
                         segment: 0,
                         index: 0,
                     },
@@ -352,21 +352,21 @@ mod tests {
 
     #[test]
     fn flakiness_scan_two_indexes() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
         let graph = Rc::new(graph);
         for i in 0..100 {
-            let mut tracker = CompressedDAGFlakinessTracker::new(graph.clone());
+            let mut tracker = CompressedDagFlakinessTracker::new(graph.clone());
             for _ in 0..i {
                 tracker.report(
-                    CompressedDAGNodeRef {
+                    CompressedDagNodeRef {
                         segment: 0,
                         index: 0,
                     },
                     true,
                 );
                 tracker.report(
-                    CompressedDAGNodeRef {
+                    CompressedDagNodeRef {
                         segment: 0,
                         index: 1,
                     },
@@ -375,14 +375,14 @@ mod tests {
             }
             for _ in i..100 {
                 tracker.report(
-                    CompressedDAGNodeRef {
+                    CompressedDagNodeRef {
                         segment: 0,
                         index: 0,
                     },
                     false,
                 );
                 tracker.report(
-                    CompressedDAGNodeRef {
+                    CompressedDagNodeRef {
                         segment: 0,
                         index: 1,
                     },
@@ -402,12 +402,12 @@ mod tests {
 
     #[test]
     fn hundred_heads_same_bucket() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         for _ in 0..100 {
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
@@ -420,12 +420,12 @@ mod tests {
 
     #[test]
     fn hundred_heads_one_tail_same_bucket() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         for _ in 0..100 {
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
@@ -433,7 +433,7 @@ mod tests {
             );
         }
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
@@ -445,19 +445,19 @@ mod tests {
 
     #[test]
     fn hundred_heads_hundred_tails_same_bucket() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         for _ in 0..100 {
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
                 true,
             );
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
@@ -470,33 +470,33 @@ mod tests {
 
     #[test]
     fn hundred_heads_hundred_tails_different_buckets() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         for _ in 0..100 {
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
                 true,
             );
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
                 false,
             );
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 1,
                 },
                 true,
             );
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 1,
                 },
@@ -509,19 +509,19 @@ mod tests {
 
     #[test]
     fn hundred_heads_hundred_tails_inverted() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         for _ in 0..100 {
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
                 true,
             );
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 1,
                 },
@@ -534,19 +534,19 @@ mod tests {
 
     #[test]
     fn hundred_heads_hundred_tails_not_inverted() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         for _ in 0..100 {
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 0,
                 },
                 false,
             );
             tracker.report(
-                CompressedDAGNodeRef {
+                CompressedDagNodeRef {
                     segment: 0,
                     index: 1,
                 },
@@ -559,19 +559,19 @@ mod tests {
 
     #[test]
     fn two_heads_sequential_segments() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![0]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![0]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 1,
                 index: 0,
             },
@@ -583,19 +583,19 @@ mod tests {
 
     #[test]
     fn one_head_one_tail_sequential_segments_inverted() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![0]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![0]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 1,
                 index: 0,
             },
@@ -607,19 +607,19 @@ mod tests {
 
     #[test]
     fn one_head_one_tail_sequential_segments_not_inverted() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![0]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![0]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             false,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 1,
                 index: 0,
             },
@@ -631,19 +631,19 @@ mod tests {
 
     #[test]
     fn two_heads_parallel_segments() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 1,
                 index: 0,
             },
@@ -655,27 +655,27 @@ mod tests {
 
     #[test]
     fn three_heads_join() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![0, 1]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![0, 1]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 1,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 2,
                 index: 0,
             },
@@ -687,27 +687,27 @@ mod tests {
 
     #[test]
     fn half_inverted_join() {
-        let mut graph = CompressedDAG::default();
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![]);
-        graph.add_node(CompressedDAGSegment::new(10), vec![0, 1]);
-        let mut tracker = CompressedDAGFlakinessTracker::new(Rc::new(graph));
+        let mut graph = CompressedDag::default();
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![]);
+        graph.add_node(CompressedDagSegment::new(10), vec![0, 1]);
+        let mut tracker = CompressedDagFlakinessTracker::new(Rc::new(graph));
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 0,
                 index: 0,
             },
             true,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 1,
                 index: 0,
             },
             false,
         );
         tracker.report(
-            CompressedDAGNodeRef {
+            CompressedDagNodeRef {
                 segment: 2,
                 index: 0,
             },

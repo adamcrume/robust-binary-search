@@ -15,33 +15,33 @@
 use im_rc::OrdSet;
 use std::collections::HashSet;
 
-/// A node in a DAG.
+/// A node in a Dag.
 #[derive(Clone, Debug)]
-pub struct DAGNode<T> {
+pub struct DagNode<T> {
     value: T,
     inputs: Vec<usize>,
     ancestors: OrdSet<usize>,
     remainder_ancestors: Vec<usize>,
 }
 
-impl<T> DAGNode<T> {
+impl<T> DagNode<T> {
     /// Returns the value in the node.
     pub fn value(&self) -> &T {
         &self.value
     }
 
-    /// Returns indices within the DAG of the node's input nodes.
+    /// Returns indices within the Dag of the node's input nodes.
     pub fn inputs(&self) -> &[usize] {
         &self.inputs
     }
 
-    /// Returns indices within the DAG of the transitive closure of the node's inputs. Includes the
+    /// Returns indices within the Dag of the transitive closure of the node's inputs. Includes the
     /// inputs but excludes the node itself.
     pub fn ancestors(&self) -> &OrdSet<usize> {
         &self.ancestors
     }
 
-    /// Returns indices within the DAG of ancestors which are not the first input or its ancestors.
+    /// Returns indices within the Dag of ancestors which are not the first input or its ancestors.
     /// In other words, the sets `remainder_ancestors()`, `{inputs()[0]}` (assuming there is at
     /// least one input), and `inputs()[0].ancestors()` (assuming there is at least one input) are
     /// disjoint, and their union equals `ancestors()`.
@@ -58,24 +58,24 @@ impl<T> DAGNode<T> {
 
 /// A Directed Acyclic Graph with the nodes sorted topologically.
 #[derive(Clone, Debug)]
-pub struct DAG<T> {
-    nodes: Vec<DAGNode<T>>,
+pub struct Dag<T> {
+    nodes: Vec<DagNode<T>>,
 }
 
-impl<T> Default for DAG<T> {
+impl<T> Default for Dag<T> {
     fn default() -> Self {
         Self { nodes: vec![] }
     }
 }
 
-impl<T> DAG<T> {
-    /// Creates an empty DAG.
+impl<T> Dag<T> {
+    /// Creates an empty Dag.
     pub fn new() -> Self {
-        DAG { nodes: vec![] }
+        Dag { nodes: vec![] }
     }
 
-    /// Returns the nodes in the DAG.
-    pub fn nodes(&self) -> &[DAGNode<T>] {
+    /// Returns the nodes in the Dag.
+    pub fn nodes(&self) -> &[DagNode<T>] {
         &self.nodes
     }
 
@@ -84,13 +84,13 @@ impl<T> DAG<T> {
     /// # Panics
     ///
     /// Panics if index is greater than or equal to nodes().len().
-    pub fn node(&self, index: usize) -> &DAGNode<T> {
+    pub fn node(&self, index: usize) -> &DagNode<T> {
         &self.nodes[index]
     }
 
-    /// Adds a node to the DAG. Each input must all be less than the index of the new node itself,
-    /// i.e. must be less than the number of nodes currently in the DAG. The first input is treated
-    /// specially by DAGNode::remainder_ancestors.
+    /// Adds a node to the Dag. Each input must all be less than the index of the new node itself,
+    /// i.e. must be less than the number of nodes currently in the Dag. The first input is treated
+    /// specially by DagNode::remainder_ancestors.
     ///
     /// # Panics
     ///
@@ -123,7 +123,7 @@ impl<T> DAG<T> {
             sorted_remainder_ancestors.sort();
             (ancestors, sorted_remainder_ancestors)
         };
-        self.nodes.push(DAGNode {
+        self.nodes.push(DagNode {
             value,
             ancestors,
             remainder_ancestors,
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn ancestor_segments() {
-        let mut graph = DAG::default();
+        let mut graph = Dag::default();
         graph.add_node((), vec![]);
         graph.add_node((), vec![0]);
         graph.add_node((), vec![1]);
@@ -160,7 +160,7 @@ mod tests {
         // 0---1---2
         //  \       \
         //   3---4---x
-        let mut graph = DAG::default();
+        let mut graph = Dag::default();
         graph.add_node((), vec![]);
         graph.add_node((), vec![0]);
         graph.add_node((), vec![1]);
