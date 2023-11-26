@@ -21,8 +21,13 @@ use std::rc::Rc;
 #[doc(hidden)]
 pub mod flakiness_tracker;
 use flakiness_tracker::*;
-mod range_map;
+pub mod range_map; // TODO: remove pub
 use range_map::*;
+pub mod range_map2; // TODO: remove
+pub mod range_map3; // TODO: remove
+pub mod range_map4; // TODO: remove
+pub mod range_map5; // TODO: remove
+pub mod range_map6; // TODO: remove
 
 mod dag;
 
